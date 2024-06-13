@@ -13,10 +13,14 @@ module.exports = {
                             (error, stdout, stderr) => {
                                 if (stdout?.trim()) {
                                     const token = stdout.trim();
-                                    project.configuration.values
-                                        .get('npmScopes')
-                                        .get(domain)
-                                        .set('npmAuthToken', token);
+                                    project.configuration.values?.
+                                        get('npmScopes')?.
+                                        get(domain)?.
+                                        set('npmAuthToken', token);
+                                    project.configuration.values?.
+                                        get('npmRegistries')?.
+                                        get(domain)?.
+                                        set('npmAuthToken', token);
                                     console.log(`Updated ${domain} codeartifact token`);
                                 }
                                 if (error !== null) {
