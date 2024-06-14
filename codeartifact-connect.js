@@ -78,7 +78,6 @@ module.exports = {
                     const token = await getToken(env, require);
                     setToken({ project: info, domain, token });
                     info.headers.authorization = `Bearer ${token}`;
-                    throw new Error("bad")
                 }
             }
         };
