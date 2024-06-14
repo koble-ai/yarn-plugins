@@ -1,48 +1,72 @@
 
-const getToken = async (env, require) => {
-    const { exec } = require('child_process');
-    const domain = env.CODE_ARTIFACT_DOMAIN;
-    return await new Promise((resolve, reject) => {
-        exec(
-            `aws codeartifact get-authorization-token --domain ${domain} --domain-owner $AWS_ACCOUNT_ID --query authorizationToken --region $AWS_REGION --output text`,
-            { env },
-            (error, stdout, stderr) => {
-                if (stdout?.trim()) {
-                    resolve(stdout.trim())
-                }
-                if (error !== null) {
-                    reject(error);
-                }
-                resolve();
-            })
-    })
-}
-
-const setToken = ({ project, domain, token }) => {
-    project.configuration.values?.
-        get('npmScopes')?.
-        get(domain)?.
-        set('npmAuthToken', token);
-    project.configuration.values?.
-        get('npmRegistries')?.
-        get(domain)?.
-        set('npmAuthToken', token);
-    console.log(`Updated ${domain} codeartifact token`);
-}
-
-const hasToken = ({ project, domain }) => {
-    return project.configuration.values?.
-        get('npmScopes')?.
-        get(domain)?.
-        get('npmAuthToken') && project.configuration.values?.
-            get('npmRegistries')?.
-            get(domain)?.
-            get('npmAuthToken');
-}
-
 module.exports = {
     name: `codeartifact-connect`,
     factory: (require) => {
+        const { exec } = require('child_process');
+        const getToken = async (env) => {
+            const domain = env.CODE_ARTIFACT_DOMAIN;
+            return await new Promise((resolve, reject) => {
+                exec(
+                    `aws codeartifact get-authorization-token --domain ${domain} --domain-owner $AWS_ACCOUNT_ID --query authorizationToken --region $AWS_REGION --output text`,
+                    { env },
+                    (error, stdout, stderr) => {
+                        if (stdout?.trim()) {
+                            resolve(stdout.trim())
+                        }
+                        if (error !== null) {
+                            reject(error);
+                        }
+                        resolve();
+                    })
+            })
+        }
+
+        const getCodeArtifactUrl = (env) => {
+            const domain = env.CODE_ARTIFACT_DOMAIN;
+            return `https://${domain}-${env.AWS_ACCOUNT_ID}.d.codeartifact.${env.AWS_REGION}.amazonaws.com/npm/${domain}`
+        }
+
+        const needsToken = (project) => {
+            const env = project.configuration.env;
+            const domain = env.CODE_ARTIFACT_DOMAIN;
+            const url = getCodeArtifactUrl(env)
+            const npmScopes = project.configuration.values.
+                get('npmScopes')
+            const npmRegistries = project.configuration.values.
+                get('npmRegistries');
+            if (!npmScopes && !npmRegistries) {
+                return false;
+            }
+            if (npmScopes?.has(domain) && !npmScopes?.get(domain).
+                get('npmAuthToken')) {
+                return true;
+            }
+            if (npmRegistries?.has(url) && !npmRegistries?.get(url).
+                get('npmAuthToken')) {
+                return true;
+            }
+            return false;
+        }
+
+        const setToken = async (project) => {
+            if (!needsToken(project)) {
+                return;
+            }
+            const env = project.configuration.env;
+            const domain = env.CODE_ARTIFACT_DOMAIN;
+            const token = await getToken(env);
+            const url = getCodeArtifactUrl(env)
+            const values = project.configuration.values;
+            values?.
+                get('npmScopes')?.
+                get(domain)?.
+                set('npmAuthToken', token);
+            values?.
+                get('npmRegistries')?.
+                get(url)?.
+                set('npmAuthToken', token);
+            console.log(`Updated ${domain} codeartifact token`);
+        }
         return {
             hooks: {
                 /**
@@ -53,32 +77,24 @@ module.exports = {
                  * }} report 
                  */
                 async validateProject(project, report) {
-                    const domain = project.configuration.env.CODE_ARTIFACT_DOMAIN;
                     try {
-                        const token = await getToken(project.configuration.env, require);
-                        setToken({ project, domain, token })
+                        await setToken(project)
                     } catch (error) {
                         report.reportError(`codeartifact-connect error: ${error}`);
                     }
                 },
                 /**
-                 * @param {() => Promise<Response>} executor 
-                 * @param {WrapNetworkRequestInfo} info 
-                 * @returns {Promise<() => Promise<Response>>}
+                 * 
+                 * @param {Project} project 
+                 * @param {NodeJS.ProcessEnv} env 
+                 * @param {(name: string, argv0: string, args: Array<string>) => Promise<void>} makePathWrapper 
                  */
-                async wrapNetworkRequest(executor, info) {
-                    const env = info.configuration.env;
-                    const domain = env.CODE_ARTIFACT_DOMAIN;
-                    if (!info.target.match(`https://${domain}-${env.AWS_ACCOUNT_ID}.d.codeartifact.${env.AWS_REGION}.amazonaws.com/npm/${domain}`)) {
-                        return executor
+                async setupScriptEnvironment(project) {
+                    try {
+                        await setToken(project);
+                    } catch (ex) {
+                        console.warn(ex);
                     }
-                    if (hasToken({ project: info, domain })) {
-                        return executor;
-                    }
-                    const token = await getToken(env, require);
-                    setToken({ project: info, domain, token });
-                    info.headers.authorization = `Bearer ${token}`;
-                    return executor;
                 }
             }
         };
