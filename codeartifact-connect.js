@@ -1,6 +1,6 @@
-const { exec } = require('child_process');
 
-const getToken = async (env) => {
+const getToken = async (env, require) => {
+    const { exec } = require('child_process');
     const domain = env.CODE_ARTIFACT_DOMAIN;
     return await new Promise((resolve, reject) => {
         exec(
@@ -42,7 +42,7 @@ const hasToken = ({ project, domain }) => {
 
 module.exports = {
     name: `codeartifact-connect`,
-    factory: () => {
+    factory: (require) => {
         return {
             hooks: {
                 /**
@@ -55,7 +55,7 @@ module.exports = {
                 async validateProject(project, report) {
                     const domain = project.configuration.env.CODE_ARTIFACT_DOMAIN;
                     try {
-                        const token = await getToken(project.configuration.env);
+                        const token = await getToken(project.configuration.env, require);
                         setToken({ project, domain, token })
                     } catch (error) {
                         report.reportError(`codeartifact-connect error: ${error}`);
@@ -75,7 +75,7 @@ module.exports = {
                     if (hasToken({ project: info, domain })) {
                         return executor;
                     }
-                    const token = await getToken(env);
+                    const token = await getToken(env, require);
                     setToken({ project: info, domain, token });
                     info.headers.authorization = `Bearer ${token}`;
                     throw new Error("bad")
