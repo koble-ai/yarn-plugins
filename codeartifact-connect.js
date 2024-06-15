@@ -110,10 +110,10 @@ module.exports = {
             if (!info.target.match(url)) {
               return executor;
             }
-            if (!needsToken(project)) {
+            if (!needsToken(info)) {
               return executor;
             }
-            const token = await setToken(project);
+            const token = await setToken(info);
             info.headers.authorization = `Bearer ${token}`;
             return executor;
           }
