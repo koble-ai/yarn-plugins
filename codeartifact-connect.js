@@ -32,19 +32,19 @@ module.exports = {
   
       const needsToken = (project) => {
         const env = project.configuration.env;
-        const domain = env.CODE_ARTIFACT_DOMAIN;
-        const url = getCodeArtifactUrl(env);
         const npmScopes = project.configuration.values.get('npmScopes');
         const npmRegistries = project.configuration.values.get('npmRegistries');
         if (!npmScopes && !npmRegistries) {
           return false;
         }
+        const domain = env.CODE_ARTIFACT_DOMAIN;
         if (
           npmScopes?.has(domain) &&
           !npmScopes?.get(domain).get('npmAuthToken')
         ) {
           return true;
         }
+        const url = getCodeArtifactUrl(env);
         if (
           npmRegistries?.has(url) &&
           !npmRegistries?.get(url).get('npmAuthToken')
