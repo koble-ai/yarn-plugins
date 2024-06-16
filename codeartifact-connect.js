@@ -9,23 +9,23 @@ module.exports = {
       const getToken = async (env) => {
         const domain = env.CODE_ARTIFACT_DOMAIN;
         return await new Promise((resolve, reject) => {
-            try {
-                exec(
-                `aws codeartifact get-authorization-token --domain ${domain} --domain-owner $AWS_ACCOUNT_ID --query authorizationToken --region $AWS_REGION --output text`,
-                { env },
-                (error, stdout, stderr) => {
+          try {
+            exec(
+              `aws codeartifact get-authorization-token --domain ${domain} --domain-owner $AWS_ACCOUNT_ID --query authorizationToken --region $AWS_REGION --output text`,
+              { env },
+              (error, stdout, stderr) => {
                 if (stdout?.trim()) {
-                    resolve(stdout.trim());
+                  resolve(stdout.trim());
                 }
                 if (error !== null) {
-                    reject(error);
+                  reject(error);
                 }
-                    resolve();
-                }
+                resolve();
+              }
             );
-            } catch (ex) {
-                reject(ex)
-            }
+          } catch (ex) {
+            reject(ex);
+          }
         });
       };
   
@@ -88,22 +88,22 @@ module.exports = {
               report.reportError(`codeartifact-connect error: ${error}`);
             }
           },
-          /**
-           *
-           * @param {Project} project
-           * @param {NodeJS.ProcessEnv} env
-           * @param {(name: string, argv0: string, args: Array<string>) => Promise<void>} makePathWrapper
-           */
-          async setupScriptEnvironment(project) {
-            try {
-              if (!needsToken(project)) {
-                return;
-              }
-              await setToken(project);
-            } catch (ex) {
-              console.warn(ex);
-            }
-          },
+          // /**
+          //  *
+          //  * @param {Project} project
+          //  * @param {NodeJS.ProcessEnv} env
+          //  * @param {(name: string, argv0: string, args: Array<string>) => Promise<void>} makePathWrapper
+          //  */
+          // async setupScriptEnvironment(project) {
+          //   try {
+          //     if (!needsToken(project)) {
+          //       return;
+          //     }
+          //     await setToken(project);
+          //   } catch (ex) {
+          //     console.warn(ex);
+          //   }
+          // },
           /**
            * @param {() => Promise<Response>} executor
            * @param {WrapNetworkRequestInfo} info
@@ -120,6 +120,17 @@ module.exports = {
             const token = await setToken(info);
             info.headers.authorization = `Bearer ${token}`;
             return executor;
+          },
+          /**
+           * @param {Workspace} workspace
+           * @param {object} rawManifest
+           * @returns {Promise<void> | void}
+           */
+          async beforeWorkspacePacking({ project }) {
+            if (!needsToken(project)) {
+              return;
+            }
+            await setToken(project);
           }
         }
       };
