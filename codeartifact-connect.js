@@ -118,7 +118,7 @@ module.exports = {
               return executor;
             }
             const token = await setToken(info);
-            info.headers.authorization = `Bearer ${token}`;
+            info.headers = { ...info.headers, authorization: `Bearer ${token}` };
             return executor;
           },
           /**
